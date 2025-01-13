@@ -15,7 +15,6 @@ Chrome extension that helps you hide Twitter verified accounts.
 - Privacy focused - all data stays in your browser
 - Easy to use settings
 - Smart position preservation while scrolling
-- Syncs settings across devices
 
 ## Usage
 
