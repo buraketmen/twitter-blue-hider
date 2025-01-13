@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { CenteredLoader } from "./components/Loader";
 import { Col, Flex, Row, Typography, Avatar, Button } from "antd";
 import { GithubOutlined } from "@ant-design/icons";
+import ClearButton from "./components/ClearButton";
 import AppIcon from "../static/icon.png";
 
 const AppActivity = React.lazy(() => import("./components/AppActivity"));
@@ -61,6 +62,9 @@ function init() {
         </Col>
         <Col span={24}>
           <AppActivity />
+        </Col>
+        <Col span={24}>
+          <ClearButton />
         </Col>
       </Row>
     </Suspense>

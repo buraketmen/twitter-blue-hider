@@ -25,7 +25,7 @@ export default function ListHidden() {
                     height: "100%",
                   }}
                 >
-                  <Skeleton.Avatar active size={32} />
+                  <Skeleton.Avatar active={false} size={32} />
                 </Flex>
 
                 <Flex
@@ -36,7 +36,7 @@ export default function ListHidden() {
                 >
                   <Flex align="center" gap={4} style={{ height: 16 }}>
                     <Flex align="center" style={{ height: "100%" }}>
-                      <Skeleton.Button active size={16} />
+                      <Skeleton.Button active={false} size={16} />
                     </Flex>
                     <Flex align="center" style={{ height: "100%" }}>
                       <svg
@@ -54,7 +54,7 @@ export default function ListHidden() {
                   </Flex>
                   <Flex align="center" style={{ height: 16 }}>
                     <Skeleton.Button
-                      active
+                      active={false}
                       block
                       size={16}
                       style={{ height: 16, width: "100%" }}

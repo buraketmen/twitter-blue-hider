@@ -1,11 +1,8 @@
-// Extension'ın aktif olup olmadığını kontrol et
 let isExtensionValid = true;
 
 chrome.runtime.onInstalled.addListener(async () => {
-  // İlk kurulumda storage'ı kontrol et
   const existingData = await getData("isEnabled");
 
-  // Sadece ilk kurulumda default değeri set et
   if (typeof existingData === "undefined") {
     chrome.storage.sync.set({
       isEnabled: true,
@@ -15,10 +12,8 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
 });
 
-// Extension geçersiz olduğunda
 chrome.runtime.onSuspend.addListener(() => {
   isExtensionValid = false;
-  // Tüm content script'lere haber ver
   chrome.tabs.query({}, (tabs) => {
     tabs.forEach((tab) => {
       try {
@@ -33,7 +28,6 @@ chrome.runtime.onSuspend.addListener(() => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   (async () => {
     try {
-      // Extension geçersizse işlem yapma
       if (!isExtensionValid) {
         sendResponse({ success: false, error: "Extension invalidated" });
         return;
@@ -41,7 +35,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       switch (request.action) {
         case "hideVerifiedPost": {
-          // Önce extension'ın aktif olup olmadığını kontrol et
           const isEnabled = await getData("isEnabled", false);
           if (!isEnabled) {
             sendResponse({ success: false, reason: "extension_disabled" });
@@ -51,7 +44,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           const hiddenPosts = await getData("hiddenPosts", {});
           hiddenPosts[request.postId] = {
             username: request.username,
-            displayName: request.displayName,
             timestamp: Date.now(),
           };
           await chrome.storage.sync.set({ hiddenPosts });
