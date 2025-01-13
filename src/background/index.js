@@ -7,7 +7,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     chrome.storage.sync.set({
       isEnabled: true,
       hiddenPosts: {},
-      showCard: true,
+      showCards: true,
     });
   }
 });
@@ -80,7 +80,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return true;
 });
 
-// Helper function to get data from storage
 const getData = async (key, defaultValue) => {
   const value = await new Promise((resolve) => {
     chrome.storage.sync.get({ [key]: defaultValue }, (result) => {

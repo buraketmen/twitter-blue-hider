@@ -5,7 +5,7 @@ import ListHidden from "./ListHidden";
 import ListActive from "./ListActive";
 
 const Popup = () => {
-  const [appActive, setAppActive] = useState(true);
+  const [appActive, setAppActive] = useState(null);
 
   useEffect(() => {
     chrome.storage.sync.get({ isEnabled: true }, (result) => {
@@ -27,13 +27,17 @@ const Popup = () => {
       </Col>
       <Col span={24}>
         <Flex justify="center" align="center">
-          <Switch
-            value={appActive}
-            onChange={onAppActivityChange}
-            checkedChildren="Active"
-            unCheckedChildren="Inactive"
-            size="large"
-          />
+          {appActive === null ? (
+            <Typography.Text type="secondary">Loading...</Typography.Text>
+          ) : (
+            <Switch
+              value={appActive}
+              onChange={onAppActivityChange}
+              checkedChildren="Active"
+              unCheckedChildren="Inactive"
+              size="large"
+            />
+          )}
         </Flex>
       </Col>
       <Col span={24} style={{ padding: 5 }}>

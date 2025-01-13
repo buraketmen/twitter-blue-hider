@@ -6,22 +6,22 @@ const Settings = () => {
   const lastSettingsKey = useRef(null);
   const [settings, setSettings] = useState({
     visible: false,
-    showCard: true,
+    showCards: true,
   });
 
   useEffect(() => {
-    chrome.storage.sync.get({ showCard: true }, (result) => {
+    chrome.storage.sync.get({ showCards: true }, (result) => {
       setSettings((prev) => ({
         ...prev,
-        showCard: result.showCard,
+        showCards: result.showCards,
       }));
     });
 
     const handleStorageChange = (changes) => {
-      if (changes.showCard) {
+      if (changes.showCards) {
         setSettings((prev) => ({
           ...prev,
-          showCard: changes.showCard.newValue,
+          showCards: changes.showCards.newValue,
         }));
       }
     };
@@ -52,10 +52,10 @@ const Settings = () => {
   };
 
   const onShowCardChange = (checked) => {
-    chrome.storage.sync.set({ showCard: checked }, () => {
+    chrome.storage.sync.set({ showCards: checked }, () => {
       setSettings((prev) => ({
         ...prev,
-        showCard: checked,
+        showCards: checked,
       }));
     });
   };
@@ -83,7 +83,7 @@ const Settings = () => {
                   <Typography.Text>Show Cards</Typography.Text>
                 </Tooltip>
                 <Switch
-                  checked={settings.showCard}
+                  checked={settings.showCards}
                   onChange={onShowCardChange}
                 />
               </Flex>

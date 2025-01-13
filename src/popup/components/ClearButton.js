@@ -5,7 +5,6 @@ const ClearButton = () => {
   const [isWhitelistEmpty, setIsWhitelistEmpty] = useState(true);
 
   useEffect(() => {
-    // Check if whitelist is empty
     const checkWhitelist = async () => {
       const { whitelistedUsers = [] } = await chrome.storage.sync.get(
         "whitelistedUsers"
@@ -15,7 +14,6 @@ const ClearButton = () => {
 
     checkWhitelist();
 
-    // Listen for changes in storage
     const handleStorageChange = (changes) => {
       if (changes.whitelistedUsers) {
         setIsWhitelistEmpty(changes.whitelistedUsers.newValue.length === 0);
@@ -30,7 +28,6 @@ const ClearButton = () => {
     try {
       await chrome.storage.sync.set({ whitelistedUsers: [] });
 
-      // Try to send message to content script
       try {
         const [tab] = await chrome.tabs.query({
           active: true,
