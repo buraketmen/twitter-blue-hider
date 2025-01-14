@@ -9,7 +9,10 @@ export const StorageManager = {
     const whitelistedUsers = await this.getWhitelistedUsers();
     if (!whitelistedUsers.includes(username)) {
       whitelistedUsers.push(username);
-      await chromeStorageSet({ whitelistedUsers });
+      const uniqueWhitelistedUsers = [...new Set(whitelistedUsers)];
+      await chromeStorageSet({
+        whitelistedUsers: uniqueWhitelistedUsers,
+      });
     }
   },
 
@@ -20,6 +23,10 @@ export const StorageManager = {
   },
 
   async isUserWhitelisted(username) {
+    if (!username) {
+      return false;
+    }
+
     const whitelistedUsers = await this.getWhitelistedUsers();
     return whitelistedUsers.includes(username);
   },

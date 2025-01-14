@@ -1,95 +1,112 @@
 import { TwitterSelectors, TwitterUsername } from "../constants";
 import { StorageManager } from "./managers";
-import { debugLog, chromeStorageGet } from "../utils";
+import { chromeStorageGet } from "../utils";
 
 export const addTooltip = (element, text) => {
-  const tooltip = document.createElement("div");
-  tooltip.style.cssText = `
-    position: absolute;
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 13px;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-    z-index: 1000;
-    white-space: nowrap;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  `;
-  tooltip.textContent = text;
-  document.body.appendChild(tooltip);
+  if (element._tooltipAdded) return;
+
+  let tooltip = null;
+
+  const createTooltip = () => {
+    if (tooltip) {
+      tooltip.remove();
+    }
+
+    tooltip = document.createElement("div");
+    tooltip.style.cssText = `
+      position: absolute;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      pointer-events: none;
+      z-index: 1000;
+      max-width: 250px;
+      word-wrap: break-word;
+      white-space: normal;
+      line-height: 1.4;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    `;
+    tooltip.textContent = text;
+    document.body.appendChild(tooltip);
+    return tooltip;
+  };
 
   const updateTooltipPosition = (e) => {
+    if (!tooltip) return;
+
     const rect = element.getBoundingClientRect();
-    tooltip.style.top =
-      rect.top - tooltip.offsetHeight - 8 + window.scrollY + "px";
-    tooltip.style.left =
-      rect.left + (rect.width - tooltip.offsetWidth) / 2 + "px";
-  };
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    const tooltipWidth = tooltip.offsetWidth;
+    const tooltipHeight = tooltip.offsetHeight;
 
-  const hideTooltip = () => {
-    tooltip.style.opacity = "0";
-  };
+    let left = rect.left + (rect.width - tooltipWidth) / 2;
+    let top = rect.top - tooltipHeight - 10 + window.scrollY;
 
-  const removeTooltip = () => {
-    tooltip.remove();
-    element.removeEventListener("mouseenter", showTooltip);
-    element.removeEventListener("mouseleave", hideTooltip);
-    element.removeEventListener("click", hideTooltip);
-    observer.disconnect();
+    if (left < 10) {
+      left = 10;
+    } else if (left + tooltipWidth > windowWidth - 10) {
+      left = windowWidth - tooltipWidth - 10;
+    }
+
+    if (top < 10) {
+      top = rect.bottom + 10 + window.scrollY;
+    } else if (top + tooltipHeight > windowHeight + window.scrollY - 10) {
+      top = rect.bottom + 10 + window.scrollY;
+    }
+
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
   };
 
   const showTooltip = (e) => {
+    createTooltip();
     updateTooltipPosition(e);
-    tooltip.style.opacity = "1";
+  };
+
+  const hideTooltip = () => {
+    if (tooltip) {
+      tooltip.remove();
+      tooltip = null;
+    }
   };
 
   element.addEventListener("mouseenter", showTooltip);
+  element.addEventListener("mousemove", updateTooltipPosition);
   element.addEventListener("mouseleave", hideTooltip);
+
   element.addEventListener("click", hideTooltip);
 
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      mutation.removedNodes.forEach((node) => {
-        if (node === element || node.contains(element)) {
-          removeTooltip();
-        }
-      });
-    });
-  });
+  element._tooltipAdded = true;
 
-  observer.observe(element.parentElement || document.body, {
-    childList: true,
-    subtree: true,
-  });
-
-  element._removeTooltip = removeTooltip;
+  return element;
 };
 
 export const createHideButton = (tweet) => {
   const hideButton = document.createElement("div");
-  hideButton.className = "tweet-hide-button";
+  hideButton.className = TwitterSelectors.hideButtonClass;
   hideButton.setAttribute("role", "button");
   hideButton.style.cssText = `
-    position: absolute;
-    right: 54px;
-    top: 0px;
+    display: inline-flex;
+    align-items: center;
+    margin-right: 16px;
     padding: 0px;
     color: #1DA1F2;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
+    z-index: 10;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    z-index: 1;
   `;
 
   const textSpan = document.createElement("span");
   textSpan.textContent = "Hide";
   textSpan.style.cssText = `
     text-decoration: none;
-    transition: text-decoration 0.2s ease;
+    transition: text-decoration 0.1s ease;
+    line-height: 1;
   `;
   hideButton.appendChild(textSpan);
 
@@ -106,56 +123,18 @@ export const createHideButton = (tweet) => {
     const username = TwitterUsername.getFromTweet(tweet);
     if (username) {
       await StorageManager.removeUser(username);
-      const showCards = await chromeStorageGet("showCards", true);
-
-      const allTweets = document.querySelectorAll(TwitterSelectors.tweet);
-      for (const t of allTweets) {
-        const tweetUsername = TwitterUsername.getFromTweet(t);
-        if (tweetUsername === username) {
-          const newCard = await createHiddenPostCard(t);
-          const cardHeight = showCards ? "72px" : "0px";
-
-          const placeholder = document.createElement("div");
-          const tweetHeight = t.offsetHeight;
-          placeholder.style.height = tweetHeight + "px";
-          placeholder.style.transition = "all 0.3s ease";
-          t.parentNode.insertBefore(placeholder, t);
-
-          const tweetRect = t.getBoundingClientRect();
-          const parentRect = t.parentElement.getBoundingClientRect();
-          t.style.position = "absolute";
-          t.style.top = tweetRect.top - parentRect.top + "px";
-          t.style.left = "0";
-          t.style.width = "100%";
-          t.style.zIndex = "1";
-
-          t.style.transition = "all 0.3s ease";
-          t.style.opacity = "1";
-          placeholder.offsetHeight; // Force reflow
-
-          t.style.opacity = "0";
-          placeholder.style.height = cardHeight;
-
-          setTimeout(() => {
-            placeholder.remove();
-            t.parentNode.insertBefore(newCard, t);
-            t.style.display = "none";
-            t.style.position = "";
-            t.style.top = "";
-            t.style.left = "";
-            t.style.width = "";
-            t.style.zIndex = "";
-            t.style.transition = "";
-            t.style.opacity = "";
-          }, 300);
-        }
-      }
+      tweet.dispatchEvent(
+        new CustomEvent("hideTweetsFromUser", {
+          bubbles: true,
+          detail: { username },
+        })
+      );
     }
   });
 
   addTooltip(
     hideButton,
-    "Hide this user's tweets and remove them from whitelist. It will hide all tweets from this user."
+    "Hide this user's tweets and remove them from whitelist"
   );
 
   return hideButton;
@@ -220,9 +199,16 @@ export const createHiddenPostCard = async (tweet) => {
       if (username) {
         await StorageManager.addUser(username);
 
+        tweet.dispatchEvent(
+          new CustomEvent("showTweetsFromUser", {
+            bubbles: true,
+            detail: { username },
+          })
+        );
+
         const placeholder = document.createElement("div");
         placeholder.style.height = "72px";
-        placeholder.style.transition = "all 0.3s ease";
+        placeholder.style.transition = "all 0.1s ease";
         tweet.parentNode.insertBefore(placeholder, tweet);
 
         tweet.style.position = "absolute";
@@ -235,7 +221,7 @@ export const createHiddenPostCard = async (tweet) => {
 
         const finalHeight = tweet.offsetHeight;
 
-        tweet.style.transition = "all 0.3s ease";
+        tweet.style.transition = "all 0.1s ease";
         placeholder.offsetHeight; // Force reflow
 
         tweet.style.opacity = "1";
@@ -256,7 +242,6 @@ export const createHiddenPostCard = async (tweet) => {
         card.remove();
       }
     } catch (error) {
-      debugLog(`Error showing post: ${error.message}`);
       tweet.style.display = "block";
       card.remove();
     }
@@ -265,16 +250,45 @@ export const createHiddenPostCard = async (tweet) => {
   return card;
 };
 
-export const addHideButtonToVisibleTweet = (tweet) => {
-  if (!tweet.querySelector(".tweet-hide-button")) {
-    const moreButton = tweet.querySelector(TwitterSelectors.moreButton);
-    if (moreButton) {
-      const hideButton = createHideButton(tweet);
-      const tweetHeader = moreButton.parentElement;
-      tweetHeader.style.position = "relative";
-      tweetHeader.appendChild(hideButton);
+export const addHideButtonToVisibleTweet = (tweet, retryCount = 0) => {
+  if (tweet.querySelector(`.${TwitterSelectors.hideButtonClass}`)) {
+    return;
+  }
+
+  const MAX_RETRIES = 3;
+
+  if (!tweet.isConnected || tweet.style.display === "none") {
+    if (retryCount < MAX_RETRIES) {
+      setTimeout(() => {
+        addHideButtonToVisibleTweet(tweet, retryCount + 1);
+      }, 500);
+    }
+    return;
+  }
+
+  let placementElement = null;
+  for (const selector of TwitterSelectors.moreButton) {
+    placementElement = tweet.querySelector(selector);
+    if (placementElement?.parentElement) {
+      break;
     }
   }
+
+  if (!placementElement?.parentElement) {
+    if (retryCount < MAX_RETRIES) {
+      setTimeout(() => {
+        addHideButtonToVisibleTweet(tweet, retryCount + 1);
+      }, 500);
+    }
+    return;
+  }
+
+  const hideButton = createHideButton(tweet);
+  const buttonContainer = placementElement.parentElement;
+
+  buttonContainer.style.display = "flex";
+  buttonContainer.style.alignItems = "center";
+  buttonContainer.insertBefore(hideButton, placementElement);
 };
 
 export const showAllTweetsFromUser = async (username) => {
@@ -283,7 +297,7 @@ export const showAllTweetsFromUser = async (username) => {
 
     for (const card of hiddenCards) {
       const cardUsernameElement = card.querySelector(
-        'span[style*="opacity: 0.5"]'
+        TwitterSelectors.cardUsername
       );
       const cardUsername = TwitterUsername.extractClean(
         cardUsernameElement?.textContent
@@ -291,15 +305,18 @@ export const showAllTweetsFromUser = async (username) => {
 
       if (cardUsername === username) {
         const tweet = card.nextElementSibling;
-        if (tweet && tweet.matches(TwitterSelectors.tweet)) {
-          addHideButtonToVisibleTweet(tweet);
-          card.remove();
-          tweet.style.display = "block";
+        if (!tweet) continue;
+        for (const selector of TwitterSelectors.tweet) {
+          if (tweet.matches(selector)) {
+            addHideButtonToVisibleTweet(tweet);
+            card.remove();
+            tweet.style.display = "block";
+            break;
+          }
         }
       }
     }
   } catch (error) {
-    debugLog(`Error showing tweets from user: ${error.message}`);
     if (error.message.includes("Extension context invalidated")) {
       cleanup();
     }

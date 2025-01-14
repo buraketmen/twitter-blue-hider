@@ -1,12 +1,25 @@
 export const TwitterSelectors = {
-  tweet: 'article[role="article"]',
+  tweet: ['article[role="article"]', 'div[data-testid="tweet"]'],
+  cardUsername: 'span[style*="opacity: 0.5"]',
   userName: '[data-testid="User-Name"]',
-  verifiedBadge: 'svg[aria-label="Verified account"]',
-  moreButton: '[aria-label="More"]',
+  verifiedBadge: [
+    '[data-testid="icon-verified"]',
+    '[aria-label="Verified account"]',
+    '[data-testid="User-Name"] [aria-label="Verified account"]',
+    '[data-testid="User-Name"] [data-testid="icon-verified"]',
+    'path[d^="M20.396 11c*"]',
+  ],
+  moreButton: [
+    'button[aria-label="More"]',
+    'button[data-testid="caret"]',
+    'button[aria-label="More options"]',
+    'div[data-testid="UserActions"]',
+  ],
   tweetText: '[data-testid="tweetText"]',
   hiddenCard: ".hidden-verified-post",
   feed: 'main[role="main"]',
   processedTweetTag: "data-processed",
+  hideButtonClass: "tweet-hide-button",
 };
 
 export const TwitterUsername = {

@@ -1,4 +1,4 @@
-import { debugLog, chromeStorageGet } from "../utils";
+import { debugLog, chromeStorageGet, getTweetsFromElement } from "../utils";
 import { TwitterSelectors } from "../constants";
 import { cleanupProcessor, processTwitterFeed } from "../core/processor";
 
@@ -29,9 +29,11 @@ export const handleExtensionStateChange = async () => {
       debugLog(`Extension enabled state changed to: ${isEnabled}`);
 
       if (!isEnabled) {
-        const hiddenTweets = document.querySelectorAll(
-          `${TwitterSelectors.tweet}[style*="display: none"]`
+        const hiddenTweets = getTweetsFromElement(
+          document,
+          '[style*="display: none"]'
         );
+
         hiddenTweets.forEach((tweet) => {
           tweet.style.display = "block";
           tweet.removeAttribute(TwitterSelectors.processedTweetTag);
@@ -53,10 +55,6 @@ export const handleExtensionStateChange = async () => {
         card.style.display = showCards ? "block" : "none";
       });
     }
-
-    debugLog(
-      `Extension state updated: showCards=${showCards}, isEnabled=${isEnabled}`
-    );
   } catch (error) {
     debugLog(`Error handling extension state change: ${error.message}`);
     if (error.message.includes("Extension context invalidated")) {

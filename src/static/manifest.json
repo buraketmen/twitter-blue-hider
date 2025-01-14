@@ -20,7 +20,7 @@
   "content_scripts": [
     {
       "matches": [
-        "https://x.com/home*",
+        "https://x.com/home",
         "https://x.com/explore*",
         "https://x.com/*/communities*"
       ],

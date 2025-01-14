@@ -85,7 +85,23 @@ export const generatePostId = (element) => {
   }
 };
 
-export const isVerifiedPost = (element) => {
-  const verifiedIcon = element.querySelector(TwitterSelectors.verifiedBadge);
-  return !!verifiedIcon;
+export const isVerifiedAccount = (element) => {
+  return TwitterSelectors.verifiedBadge.some((selector) =>
+    element.querySelector(selector)
+  );
+};
+
+export const getTweetsFromElement = (element, suffix = "") => {
+  if (!element) return [];
+  const tweets = [];
+  TwitterSelectors.tweet.forEach((selector) => {
+    const tweetNodes = element.querySelectorAll(selector + suffix);
+    if (tweetNodes) tweets.push(...tweetNodes);
+  });
+  const uniqueOuterText = [...new Set(tweets.map((tweet) => tweet.outerText))];
+  const uniqueTweets = uniqueOuterText.map((outerText) => {
+    return tweets.find((tweet) => tweet.outerText === outerText);
+  });
+
+  return uniqueTweets;
 };
