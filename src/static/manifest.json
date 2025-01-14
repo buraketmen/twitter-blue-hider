@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Twitter Blue Hider",
-  "description": "Hide Twitter Blue from your timeline.",
+  "description": "Hide X (formerly Twitter) verified accounts from your screen. You can also add them to your whitelist to never hide them again.",
   "version": "1.0.0",
   "icons": {
     "16": "icon.png",
