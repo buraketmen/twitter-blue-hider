@@ -1,58 +1,32 @@
 import { TwitterSelectors } from "./constants";
-import { cleanup } from "./state";
+import { TwitterUsername } from "./core/twitter";
 
 export const debugLog = (message) => {
   console.log(`[Twitter Blue Hider]: ${message}`);
 };
 
-export const withErrorHandling = (fn) => {
-  return (...args) => {
-    try {
-      const result = fn(...args);
-      if (result instanceof Promise) {
-        return result.catch((error) => {
-          if (error.message.includes("Extension context invalidated")) {
-            debugLog("Extension context invalidated, cleaning up...");
-            cleanup();
-            return;
-          }
-          throw error;
-        });
-      }
-      return result;
-    } catch (error) {
-      if (error.message.includes("Extension context invalidated")) {
-        debugLog("Extension context invalidated, cleaning up...");
-        cleanup();
-        return;
-      }
-      throw error;
-    }
-  };
-};
-
-export const chromeStorageGet = (key, defaultValue) => {
+export const chromeStorageGet = async (key, defaultValue) => {
   try {
     return new Promise((resolve, reject) => {
       if (!chrome.runtime?.id) {
-        reject(new Error("Extension context invalidated"));
+        resolve(defaultValue);
         return;
       }
 
       chrome.storage.sync.get({ [key]: defaultValue }, (result) => {
         if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
+          resolve(defaultValue);
           return;
         }
         resolve(result[key]);
       });
     });
   } catch (error) {
-    return Promise.reject(error);
+    return Promise.reject(defaultValue);
   }
 };
 
-export const chromeStorageSet = (data) => {
+export const chromeStorageSet = async (data) => {
   try {
     return new Promise((resolve, reject) => {
       if (!chrome.runtime?.id) {
@@ -73,26 +47,19 @@ export const chromeStorageSet = (data) => {
   }
 };
 
-export const getStorageData = withErrorHandling(chromeStorageGet);
-
 export const generatePostId = (element) => {
   try {
-    const tweetLink = element.querySelector(TwitterSelectors.tweetLink)?.href;
-    if (tweetLink) {
-      const match = tweetLink.match(/status\/(\d+)/);
-      if (match?.[1]) {
-        return `tweet-${match[1]}`;
-      }
-    }
+    const username = TwitterUsername.getFromTweet(element);
+    const tweetTextElement = element.querySelector(TwitterSelectors.tweetText);
+    const text = tweetTextElement
+      ? tweetTextElement.textContent
+          .slice(0, 100)
+          .replace(/[^\w\s-]/g, "")
+          .trim()
+          .toLowerCase()
+      : "";
 
-    const timestamp = element.querySelector("time")?.dateTime || Date.now();
-    const text = element.textContent
-      .slice(0, 50)
-      .replace(/[^\w\s-]/g, "")
-      .trim()
-      .toLowerCase();
-
-    const hashStr = `${timestamp}-${text}`;
+    const hashStr = `${username || "unknown"}-${text}`;
     let hash = 0;
     for (let i = 0; i < hashStr.length; i++) {
       const char = hashStr.charCodeAt(i);

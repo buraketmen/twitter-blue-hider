@@ -3,12 +3,12 @@ export const TwitterSelectors = {
   userName: '[data-testid="User-Name"]',
   verifiedBadge: 'svg[aria-label="Verified account"]',
   moreButton: '[data-testid="caret"]',
-  tweetLink: 'a[href*="/status/"]',
-  tweetContainer: '[data-testid="cellInnerDiv"]',
   tweetGroup: 'div[role="group"]',
-  timestamp: "time",
+  tweetText: '[data-testid="tweetText"]',
   hiddenCard: ".hidden-verified-post",
+  feed: 'main[role="main"]',
+  processedTweetTag: "data-processed",
 };
 
 export const SCROLL_THRESHOLD = 100;
-export const SCROLL_DEBOUNCE = 150;
+export const SCROLL_PROCESS_DELAY = 100;

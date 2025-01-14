@@ -1,6 +1,6 @@
-import { TwitterSelectors } from "./constants";
-import { WhitelistManager, StorageManager } from "./managers";
-import { generatePostId, debugLog } from "./utils";
+import { TwitterSelectors } from "../constants";
+import { StorageManager } from "./managers";
+import { debugLog, chromeStorageGet } from "../utils";
 
 export const TwitterUsername = {
   extractClean: (fullUsername) => {
@@ -88,7 +88,7 @@ export const addTooltip = (element, text) => {
   element._removeTooltip = removeTooltip;
 };
 
-export const createHideButton = (tweet, postId) => {
+export const createHideButton = (tweet) => {
   const hideButton = document.createElement("div");
   hideButton.className = "tweet-hide-button";
   hideButton.setAttribute("role", "button");
@@ -125,8 +125,8 @@ export const createHideButton = (tweet, postId) => {
     e.stopPropagation();
     const username = TwitterUsername.getFromTweet(tweet);
     if (username) {
-      await WhitelistManager.removeUser(username);
-      const newCard = await createHiddenPostCard(tweet, postId);
+      await StorageManager.removeUser(username);
+      const newCard = await createHiddenPostCard(tweet);
       tweet.parentNode.insertBefore(newCard, tweet);
       tweet.style.display = "none";
     }
@@ -140,13 +140,12 @@ export const createHideButton = (tweet, postId) => {
   return hideButton;
 };
 
-export const createHiddenPostCard = async (postElement, postId) => {
+export const createHiddenPostCard = async (tweet) => {
   const selectedUsername =
-    postElement.querySelector(TwitterSelectors.userName)?.textContent ||
-    "Unknown";
+    tweet.querySelector(TwitterSelectors.userName)?.textContent || "Unknown";
   const [name, rest] = selectedUsername.split("@");
 
-  const { showCards } = await chrome.storage.sync.get({ showCards: true });
+  const showCards = await chromeStorageGet("showCards", true);
   const card = document.createElement("div");
   card.className = TwitterSelectors.hiddenCard.replace(".", "");
   card.style.cssText = `
@@ -192,16 +191,15 @@ export const createHiddenPostCard = async (postElement, postId) => {
 
   button.addEventListener("click", async () => {
     try {
-      const username = TwitterUsername.getFromTweet(postElement);
+      const username = TwitterUsername.getFromTweet(tweet);
 
       if (username) {
-        await WhitelistManager.addUser(username);
-        await StorageManager.removeUserTweets(username);
+        await StorageManager.addUser(username);
         await showAllTweetsFromUser(username);
       }
     } catch (error) {
       debugLog(`Error showing post: ${error.message}`);
-      postElement.style.display = "block";
+      tweet.style.display = "block";
       card.remove();
     }
   });
@@ -213,7 +211,7 @@ export const addHideButtonToVisibleTweet = (tweet) => {
   if (!tweet.querySelector(".tweet-hide-button")) {
     const moreButton = tweet.querySelector(TwitterSelectors.moreButton);
     if (moreButton) {
-      const hideButton = createHideButton(tweet, generatePostId(tweet));
+      const hideButton = createHideButton(tweet);
       const tweetHeader =
         moreButton.closest(TwitterSelectors.tweetGroup) ||
         moreButton.parentElement;
@@ -241,7 +239,7 @@ export const showAllTweetsFromUser = async (username) => {
           if (!tweet.querySelector(".tweet-hide-button")) {
             const moreButton = tweet.querySelector(TwitterSelectors.moreButton);
             if (moreButton) {
-              const hideButton = createHideButton(tweet, generatePostId(tweet));
+              const hideButton = createHideButton(tweet);
               const tweetHeader =
                 moreButton.closest(TwitterSelectors.tweetGroup) ||
                 moreButton.parentElement;

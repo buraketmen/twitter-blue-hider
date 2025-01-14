@@ -13,13 +13,17 @@
     "default_popup": "popup.html"
   },
   "permissions": ["storage"],
-  "host_permissions": ["https://twitter.com/*", "https://x.com/*"],
+  "host_permissions": ["https://x.com/*"],
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": ["https://twitter.com/*", "https://x.com/*"],
+      "matches": [
+        "https://x.com/home*",
+        "https://x.com/explore*",
+        "https://x.com/*/communities*"
+      ],
       "js": ["contentScript.js"]
     }
   ]

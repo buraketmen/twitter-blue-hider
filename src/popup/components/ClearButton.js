@@ -33,7 +33,7 @@ const ClearButton = () => {
           active: true,
           currentWindow: true,
         });
-        if (tab?.url?.includes("twitter.com")) {
+        if (tab?.url?.includes("x.com") || tab?.url?.includes("twitter.com")) {
           await chrome.tabs.sendMessage(tab.id, { type: "REFRESH_FEED" });
         }
       } catch (error) {
