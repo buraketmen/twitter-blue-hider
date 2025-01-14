@@ -135,20 +135,38 @@ export const createHideButton = (tweet) => {
           const newCard = await createHiddenPostCard(t);
           const cardHeight = showCards ? "72px" : "0px";
 
+          // Create a placeholder with the same height
+          const placeholder = document.createElement("div");
+          const tweetHeight = t.offsetHeight;
+          placeholder.style.height = tweetHeight + "px";
+          placeholder.style.transition = "all 0.3s ease";
+          t.parentNode.insertBefore(placeholder, t);
+
+          const tweetRect = t.getBoundingClientRect();
+          const parentRect = t.parentElement.getBoundingClientRect();
+          t.style.position = "absolute";
+          t.style.top = tweetRect.top - parentRect.top + "px";
+          t.style.left = "0";
+          t.style.width = "100%";
+          t.style.zIndex = "1";
+
           t.style.transition = "all 0.3s ease";
-          t.style.maxHeight = t.scrollHeight + "px";
           t.style.opacity = "1";
+          placeholder.offsetHeight; // Force reflow
 
-          t.offsetHeight;
-
-          t.style.maxHeight = cardHeight;
           t.style.opacity = "0";
+          placeholder.style.height = cardHeight;
 
           setTimeout(() => {
+            placeholder.remove();
             t.parentNode.insertBefore(newCard, t);
             t.style.display = "none";
+            t.style.position = "";
+            t.style.top = "";
+            t.style.left = "";
+            t.style.width = "";
+            t.style.zIndex = "";
             t.style.transition = "";
-            t.style.maxHeight = "";
             t.style.opacity = "";
           }, 300);
         }
@@ -220,22 +238,39 @@ export const createHiddenPostCard = async (tweet) => {
       if (username) {
         await StorageManager.addUser(username);
 
-        tweet.style.transition = "all 0.3s ease";
-        tweet.style.maxHeight = "0";
+        const placeholder = document.createElement("div");
+        placeholder.style.height = "72px"; // Hidden card height
+        placeholder.style.transition = "all 0.3s ease";
+        tweet.parentNode.insertBefore(placeholder, tweet);
+
+        tweet.style.position = "absolute";
+        tweet.style.top = "0";
+        tweet.style.left = "0";
+        tweet.style.width = "100%";
+        tweet.style.zIndex = "1";
         tweet.style.opacity = "0";
         tweet.style.display = "block";
 
-        tweet.offsetHeight;
+        const finalHeight = tweet.offsetHeight;
 
-        tweet.style.maxHeight = tweet.scrollHeight + "px";
+        tweet.style.transition = "all 0.3s ease";
+        placeholder.offsetHeight; // Force reflow
+
         tweet.style.opacity = "1";
+        placeholder.style.height = finalHeight + "px";
 
         setTimeout(() => {
+          tweet.style.position = "";
+          tweet.style.top = "";
+          tweet.style.left = "";
+          tweet.style.width = "";
+          tweet.style.zIndex = "";
           tweet.style.transition = "";
-          tweet.style.maxHeight = "";
+          tweet.style.opacity = "";
+          placeholder.remove();
+          addHideButtonToVisibleTweet(tweet);
         }, 300);
 
-        addHideButtonToVisibleTweet(tweet);
         card.remove();
       }
     } catch (error) {
