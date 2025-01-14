@@ -14,8 +14,6 @@ const processedTweetIds = new Set();
 const processTweet = async (tweet) => {
   try {
     const tweetId = generatePostId(tweet);
-    if (processedTweetIds.has(tweetId)) return;
-
     const verifiedBadge = tweet.querySelector(TwitterSelectors.verifiedBadge);
     if (!verifiedBadge) return;
 
@@ -78,9 +76,7 @@ const setupMutationObserver = () => {
         if (node.nodeType === Node.ELEMENT_NODE) {
           const tweets = node.querySelectorAll(TwitterSelectors.tweet);
           tweets.forEach((tweet) => {
-            if (!tweet.hasAttribute(TwitterSelectors.processedTweetTag)) {
-              visibilityObserver.observe(tweet);
-            }
+            visibilityObserver.observe(tweet);
           });
         }
       });

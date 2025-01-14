@@ -126,9 +126,33 @@ export const createHideButton = (tweet) => {
     const username = TwitterUsername.getFromTweet(tweet);
     if (username) {
       await StorageManager.removeUser(username);
-      const newCard = await createHiddenPostCard(tweet);
-      tweet.parentNode.insertBefore(newCard, tweet);
-      tweet.style.display = "none";
+      const showCards = await chromeStorageGet("showCards", true);
+
+      const allTweets = document.querySelectorAll(TwitterSelectors.tweet);
+      for (const t of allTweets) {
+        const tweetUsername = TwitterUsername.getFromTweet(t);
+        if (tweetUsername === username) {
+          const newCard = await createHiddenPostCard(t);
+          const cardHeight = showCards ? "72px" : "0px";
+
+          t.style.transition = "all 0.3s ease";
+          t.style.maxHeight = t.scrollHeight + "px";
+          t.style.opacity = "1";
+
+          t.offsetHeight;
+
+          t.style.maxHeight = cardHeight;
+          t.style.opacity = "0";
+
+          setTimeout(() => {
+            t.parentNode.insertBefore(newCard, t);
+            t.style.display = "none";
+            t.style.transition = "";
+            t.style.maxHeight = "";
+            t.style.opacity = "";
+          }, 300);
+        }
+      }
     }
   });
 
@@ -195,7 +219,24 @@ export const createHiddenPostCard = async (tweet) => {
 
       if (username) {
         await StorageManager.addUser(username);
-        await showAllTweetsFromUser(username);
+
+        tweet.style.transition = "all 0.3s ease";
+        tweet.style.maxHeight = "0";
+        tweet.style.opacity = "0";
+        tweet.style.display = "block";
+
+        tweet.offsetHeight;
+
+        tweet.style.maxHeight = tweet.scrollHeight + "px";
+        tweet.style.opacity = "1";
+
+        setTimeout(() => {
+          tweet.style.transition = "";
+          tweet.style.maxHeight = "";
+        }, 300);
+
+        addHideButtonToVisibleTweet(tweet);
+        card.remove();
       }
     } catch (error) {
       debugLog(`Error showing post: ${error.message}`);
@@ -212,9 +253,7 @@ export const addHideButtonToVisibleTweet = (tweet) => {
     const moreButton = tweet.querySelector(TwitterSelectors.moreButton);
     if (moreButton) {
       const hideButton = createHideButton(tweet);
-      const tweetHeader =
-        moreButton.closest(TwitterSelectors.tweetGroup) ||
-        moreButton.parentElement;
+      const tweetHeader = moreButton.parentElement;
       tweetHeader.style.position = "relative";
       tweetHeader.appendChild(hideButton);
     }
@@ -236,18 +275,7 @@ export const showAllTweetsFromUser = async (username) => {
       if (cardUsername === username) {
         const tweet = card.nextElementSibling;
         if (tweet && tweet.matches(TwitterSelectors.tweet)) {
-          if (!tweet.querySelector(".tweet-hide-button")) {
-            const moreButton = tweet.querySelector(TwitterSelectors.moreButton);
-            if (moreButton) {
-              const hideButton = createHideButton(tweet);
-              const tweetHeader =
-                moreButton.closest(TwitterSelectors.tweetGroup) ||
-                moreButton.parentElement;
-              tweetHeader.style.position = "relative";
-              tweetHeader.appendChild(hideButton);
-            }
-          }
-
+          addHideButtonToVisibleTweet(tweet);
           card.remove();
           tweet.style.display = "block";
         }
