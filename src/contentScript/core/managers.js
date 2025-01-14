@@ -1,4 +1,4 @@
-import { chromeStorageGet, chromeStorageSet, debugLog } from "../utils";
+import { chromeStorageGet, chromeStorageSet } from "../utils";
 
 export const StorageManager = {
   async getWhitelistedUsers() {

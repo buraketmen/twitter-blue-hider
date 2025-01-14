@@ -1,5 +1,4 @@
-import { TwitterSelectors } from "./constants";
-import { TwitterUsername } from "./core/twitter";
+import { TwitterSelectors, TwitterUsername } from "./constants";
 
 export const debugLog = (message) => {
   console.log(`[Twitter Blue Hider]: ${message}`);
@@ -53,22 +52,35 @@ export const generatePostId = (element) => {
     const tweetTextElement = element.querySelector(TwitterSelectors.tweetText);
     const text = tweetTextElement
       ? tweetTextElement.textContent
-          .slice(0, 100)
+          .slice(0, 300)
           .replace(/[^\w\s-]/g, "")
+          .replace(/\s+/g, " ")
           .trim()
           .toLowerCase()
       : "";
 
     const hashStr = `${username || "unknown"}-${text}`;
-    let hash = 0;
+    let hash1 = 0,
+      hash2 = 0,
+      hash3 = 0;
+
     for (let i = 0; i < hashStr.length; i++) {
       const char = hashStr.charCodeAt(i);
-      hash = (hash << 5) - hash + char;
-      hash = hash & hash;
+
+      hash1 = (hash1 << 5) - hash1 + char;
+      hash1 = hash1 & 0x7fffffff;
+
+      hash2 = (hash2 << 7) - hash2 + char * 31;
+      hash2 = hash2 & 0x7fffffff;
+
+      hash3 = (hash3 << 3) - hash3 + char * 17;
+      hash3 = hash3 & 0x7fffffff;
     }
-    return `hash-${Math.abs(hash).toString(36)}`;
+
+    const combinedHash = `${hash1}-${hash2}-${hash3}`;
+
+    return `hash-${combinedHash.toString(36)}`;
   } catch (error) {
-    debugLog(`Error generating postId: ${error.message}`);
     return `time-${Date.now().toString(36)}`;
   }
 };

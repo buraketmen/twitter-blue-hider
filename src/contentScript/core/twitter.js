@@ -1,26 +1,6 @@
-import { TwitterSelectors } from "../constants";
+import { TwitterSelectors, TwitterUsername } from "../constants";
 import { StorageManager } from "./managers";
 import { debugLog, chromeStorageGet } from "../utils";
-
-export const TwitterUsername = {
-  extractClean: (fullUsername) => {
-    if (!fullUsername) return null;
-    const username = fullUsername.split("@")[1]?.split("·")[0]?.trim();
-    return username || null;
-  },
-
-  getFromTweet: (tweet) => {
-    const userNameElement = tweet.querySelector(TwitterSelectors.userName);
-    if (!userNameElement) return null;
-    return TwitterUsername.extractClean(userNameElement.textContent);
-  },
-
-  getFullUsername: (tweet) => {
-    return (
-      tweet.querySelector(TwitterSelectors.userName)?.textContent || "Unknown"
-    );
-  },
-};
 
 export const addTooltip = (element, text) => {
   const tooltip = document.createElement("div");
@@ -94,7 +74,7 @@ export const createHideButton = (tweet) => {
   hideButton.setAttribute("role", "button");
   hideButton.style.cssText = `
     position: absolute;
-    right: 32px;
+    right: 54px;
     top: 0px;
     padding: 0px;
     color: #1DA1F2;
@@ -135,7 +115,6 @@ export const createHideButton = (tweet) => {
           const newCard = await createHiddenPostCard(t);
           const cardHeight = showCards ? "72px" : "0px";
 
-          // Create a placeholder with the same height
           const placeholder = document.createElement("div");
           const tweetHeight = t.offsetHeight;
           placeholder.style.height = tweetHeight + "px";
@@ -176,7 +155,7 @@ export const createHideButton = (tweet) => {
 
   addTooltip(
     hideButton,
-    "Hide this user's tweets and remove them from whitelist"
+    "Hide this user's tweets and remove them from whitelist. It will hide all tweets from this user."
   );
 
   return hideButton;
@@ -229,7 +208,10 @@ export const createHiddenPostCard = async (tweet) => {
     buttonText.style.textDecoration = "none";
   });
 
-  addTooltip(button, "Show this tweet and add user to whitelist");
+  addTooltip(
+    button,
+    "Show this tweet and add user to whitelist. It will be available for new tweets."
+  );
 
   button.addEventListener("click", async () => {
     try {
@@ -239,7 +221,7 @@ export const createHiddenPostCard = async (tweet) => {
         await StorageManager.addUser(username);
 
         const placeholder = document.createElement("div");
-        placeholder.style.height = "72px"; // Hidden card height
+        placeholder.style.height = "72px";
         placeholder.style.transition = "all 0.3s ease";
         tweet.parentNode.insertBefore(placeholder, tweet);
 

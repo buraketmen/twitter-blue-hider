@@ -1,21 +1,17 @@
-import { TwitterSelectors } from "../constants";
-import { debugLog, chromeStorageGet, generatePostId } from "../utils";
+import { TwitterSelectors, TwitterUsername } from "../constants";
+import { debugLog, chromeStorageGet } from "../utils";
 import { StorageManager } from "./managers";
-import {
-  createHiddenPostCard,
-  addHideButtonToVisibleTweet,
-  TwitterUsername,
-} from "./twitter";
+import { createHiddenPostCard, addHideButtonToVisibleTweet } from "./twitter";
 
 let visibilityObserver = null;
 let mutationObserver = null;
-const processedTweetIds = new Set();
 
 const processTweet = async (tweet) => {
   try {
-    const tweetId = generatePostId(tweet);
     const verifiedBadge = tweet.querySelector(TwitterSelectors.verifiedBadge);
-    if (!verifiedBadge) return;
+    if (!verifiedBadge) {
+      return;
+    }
 
     const username = TwitterUsername.getFromTweet(tweet);
     const isWhitelisted =
@@ -36,10 +32,8 @@ const processTweet = async (tweet) => {
       addHideButtonToVisibleTweet(tweet);
     }
 
-    processedTweetIds.add(tweetId);
     tweet.setAttribute(TwitterSelectors.processedTweetTag, "true");
   } catch (error) {
-    debugLog(`Error processing tweet: ${error.message}`);
     tweet.style.display = "none";
   }
 };
@@ -59,7 +53,7 @@ const setupVisibilityObserver = () => {
     },
     {
       root: null,
-      rootMargin: "100px",
+      rootMargin: "200px",
       threshold: 0,
     }
   );
@@ -71,16 +65,41 @@ const setupMutationObserver = () => {
   }
 
   mutationObserver = new MutationObserver((mutations) => {
+    const newTweets = [];
+    let mutationCount = 0;
+
     mutations.forEach((mutation) => {
-      mutation.addedNodes.forEach((node) => {
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          const tweets = node.querySelectorAll(TwitterSelectors.tweet);
-          tweets.forEach((tweet) => {
-            visibilityObserver.observe(tweet);
-          });
-        }
-      });
+      if (mutation.type === "childList") {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const tweets = [];
+
+            if (node.matches(TwitterSelectors.tweet)) {
+              tweets.push(node);
+            }
+
+            const nestedTweets = node.querySelectorAll
+              ? node.querySelectorAll(TwitterSelectors.tweet)
+              : [];
+
+            tweets.push(...nestedTweets);
+
+            tweets.forEach((tweet) => {
+              if (!tweet.hasAttribute(TwitterSelectors.processedTweetTag)) {
+                newTweets.push(tweet);
+                mutationCount++;
+              }
+            });
+          }
+        });
+      }
     });
+
+    if (newTweets.length > 0) {
+      newTweets.forEach((tweet) => {
+        visibilityObserver.observe(tweet);
+      });
+    }
   });
 
   mutationObserver.observe(document.body, {
@@ -94,15 +113,24 @@ export const processTwitterFeed = async () => {
     const isEnabled = await chromeStorageGet("isEnabled", true);
     if (!isEnabled) return;
 
+    debugLog("Starting Twitter feed processing");
+
     setupVisibilityObserver();
     setupMutationObserver();
 
-    const tweets = document.querySelectorAll(TwitterSelectors.tweet);
-    tweets.forEach((tweet) => {
-      if (!tweet.hasAttribute(TwitterSelectors.processedTweetTag)) {
+    const processInitialTweets = async () => {
+      const tweets = document.querySelectorAll(TwitterSelectors.tweet);
+
+      tweets.forEach((tweet) => {
         visibilityObserver.observe(tweet);
+      });
+
+      if (tweets.length === 0) {
+        setTimeout(processInitialTweets, 2000);
       }
-    });
+    };
+
+    await processInitialTweets();
 
     const showCards = await chromeStorageGet("showCards", true);
     const hiddenCards = document.querySelectorAll(TwitterSelectors.hiddenCard);
@@ -127,5 +155,4 @@ export const cleanupProcessor = () => {
     mutationObserver.disconnect();
     mutationObserver = null;
   }
-  processedTweetIds.clear();
 };
