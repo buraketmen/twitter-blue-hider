@@ -1,4 +1,7 @@
 import { TwitterSelectors, TwitterUsername } from "./constants";
+import { tweetQueue } from "./core/task-queue";
+
+let lastScrollTime = 0; // Prevents rapid scrolling
 
 export const debugLog = (message) => {
   console.log(`[Twitter Blue Hider]: ${message}`);
@@ -104,4 +107,110 @@ export const getTweetsFromElement = (element, suffix = "") => {
   });
 
   return uniqueTweets;
+};
+
+export const isTweetProcessing = (tweet) => {
+  return tweet.dataset.processing === "true";
+};
+
+let scrollQueue = [];
+let isProcessingScroll = false;
+
+const processScrollQueue = () => {
+  if (isProcessingScroll || scrollQueue.length === 0) return;
+
+  isProcessingScroll = true;
+  const { position, callback } = scrollQueue.shift();
+
+  window.scrollTo({
+    top: Math.max(0, position),
+    behavior: "auto",
+  });
+
+  setTimeout(() => {
+    isProcessingScroll = false;
+    callback?.();
+    processScrollQueue();
+  }, 50);
+};
+
+export const handleElementVisibility = (element, options = {}) => {
+  const { scrollAdjustment = true, onComplete = () => {} } = options;
+
+  if (!element || !element.isConnected) {
+    return {
+      height: 0,
+      afterChange: async () => {},
+    };
+  }
+
+  const elementRect = element.getBoundingClientRect();
+  const initialHeight = elementRect.height;
+
+  const adjustScroll = async (heightDiff) => {
+    if (!scrollAdjustment || Math.abs(heightDiff) <= 10) return;
+    if (window.scrollY <= 150) return;
+
+    const now = Date.now();
+    if (now - lastScrollTime < 150) return;
+    lastScrollTime = now;
+
+    const elementVisible =
+      elementRect.top >= 0 && elementRect.bottom <= window.innerHeight;
+
+    if (!elementVisible) return;
+
+    await tweetQueue.add(
+      () =>
+        new Promise((resolve) => {
+          const currentScroll = window.scrollY;
+          const targetScroll = Math.max(0, currentScroll - heightDiff);
+
+          if (Math.abs(currentScroll - targetScroll) <= 10) {
+            resolve();
+            return;
+          }
+
+          window.scrollTo({
+            top: targetScroll,
+            behavior: "instant",
+          });
+
+          // Wait for the scroll to complete
+          requestAnimationFrame(() => {
+            setTimeout(resolve, 32);
+          });
+        })
+    );
+  };
+
+  return {
+    height: initialHeight,
+    afterChange: async (newElement) => {
+      if (!newElement) return;
+      const newHeight = newElement.getBoundingClientRect().height;
+      const heightDiff = initialHeight - newHeight;
+      await adjustScroll(heightDiff);
+      onComplete(newElement);
+    },
+  };
+};
+
+export const handleTweetVisibility = async (tweet, options = {}) => {
+  const handler = handleElementVisibility(tweet, options);
+
+  if (!handler) {
+    return {
+      initialHeight: 0,
+      handler: {
+        height: 0,
+        afterChange: async () => {},
+      },
+    };
+  }
+
+  return {
+    initialHeight: handler.height || 0,
+    handler,
+  };
 };

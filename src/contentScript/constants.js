@@ -1,5 +1,6 @@
 export const TwitterSelectors = {
-  tweet: ['article[role="article"]', 'div[data-testid="tweet"]'],
+  feed: 'main[role="main"]',
+  tweet: ["article", '[data-testid="tweet"]'],
   cardUsername: 'span[style*="opacity: 0.5"]',
   userName: '[data-testid="User-Name"]',
   verifiedBadge: [
@@ -16,9 +17,7 @@ export const TwitterSelectors = {
     'div[data-testid="UserActions"]',
   ],
   tweetText: '[data-testid="tweetText"]',
-  hiddenCard: ".hidden-verified-post",
-  feed: 'main[role="main"]',
-  processedTweetTag: "data-processed",
+  hiddenCardClass: "hidden-verified-post",
   hideButtonClass: "tweet-hide-button",
 };
 

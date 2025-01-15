@@ -36,11 +36,10 @@ export const handleExtensionStateChange = async () => {
 
         hiddenTweets.forEach((tweet) => {
           tweet.style.display = "block";
-          tweet.removeAttribute(TwitterSelectors.processedTweetTag);
         });
 
         const hiddenCards = document.querySelectorAll(
-          TwitterSelectors.hiddenCard
+          `.${TwitterSelectors.hiddenCardClass}`
         );
         hiddenCards.forEach((card) => card.remove());
         cleanup();
@@ -49,7 +48,7 @@ export const handleExtensionStateChange = async () => {
       }
     } else if (showCards !== undefined) {
       const hiddenCards = document.querySelectorAll(
-        TwitterSelectors.hiddenCard
+        `.${TwitterSelectors.hiddenCardClass}`
       );
       hiddenCards.forEach((card) => {
         card.style.display = showCards ? "block" : "none";

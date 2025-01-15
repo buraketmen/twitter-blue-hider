@@ -2,194 +2,197 @@ import { TwitterSelectors, TwitterUsername } from "../constants";
 import {
   debugLog,
   chromeStorageGet,
-  generatePostId,
   isVerifiedAccount,
   getTweetsFromElement,
+  handleTweetVisibility,
+  isTweetProcessing,
 } from "../utils";
+import { tweetQueue } from "./task-queue";
 import { StorageManager } from "./managers";
 import { createHiddenPostCard, addHideButtonToVisibleTweet } from "./twitter";
 
 let tweetObserver = null;
-const processedTweets = new Set();
+let visibleTweetsObserver = null;
 
 const processTweet = async (tweet) => {
-  const tweetId = generatePostId(tweet);
   try {
-    if (processedTweets.has(tweetId)) {
+    if (tweet.dataset.processed === "true" || isTweetProcessing(tweet)) {
       return;
     }
 
-    processedTweets.add(tweetId);
+    tweet.dataset.processing = "true";
+    const { handler } = await handleTweetVisibility(tweet);
 
-    const isVerified = isVerifiedAccount(tweet);
-    if (!isVerified) {
-      return;
-    }
-
-    const username = TwitterUsername.getFromTweet(tweet);
-    const isWhitelisted = await StorageManager.isUserWhitelisted(username);
-
-    if (!isWhitelisted) {
-      if (!tweet.isConnected || !tweet.parentNode) {
-        processedTweets.delete(tweetId);
+    await tweetQueue.add(async () => {
+      const isVerified = isVerifiedAccount(tweet);
+      if (!isVerified) {
+        tweet.dataset.processed = "true";
+        tweet.dataset.processing = "false";
         return;
       }
 
-      const previousSibling = tweet.previousElementSibling;
-      if (
-        previousSibling?.matches?.(
-          `.${TwitterSelectors.hiddenCard.replace(".", "")}`
-        )
-      ) {
-        tweet.style.display = "none";
-        return;
-      }
+      const username = TwitterUsername.getFromTweet(tweet);
+      const isWhitelisted = await StorageManager.isUserWhitelisted(username);
 
-      try {
-        const hiddenCard = await createHiddenPostCard(tweet);
+      if (!isWhitelisted) {
+        const createdHiddenCard = await createHiddenPostCard(tweet);
+        if (createdHiddenCard && tweet.isConnected) {
+          createdHiddenCard.style.opacity = "0";
+          tweet.style.opacity = "0";
+          tweet.parentNode.insertBefore(createdHiddenCard, tweet);
 
-        if (tweet.isConnected && tweet.parentNode && hiddenCard) {
-          tweet.parentNode.insertBefore(hiddenCard, tweet);
-          tweet.style.display = "none";
-        } else {
-          processedTweets.delete(tweetId);
+          await new Promise((resolve) => {
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                tweet.style.display = "none";
+                createdHiddenCard.style.opacity = "1";
+                handler.afterChange(createdHiddenCard);
+                tweet.dataset.processed = "true";
+                tweet.dataset.processing = "false";
+                resolve();
+              });
+            });
+          });
         }
-      } catch (error) {
-        processedTweets.delete(tweetId);
+      } else {
+        const hiddenCard = tweet.previousElementSibling;
+        if (hiddenCard?.matches?.(`.${TwitterSelectors.hiddenCardClass}`)) {
+          hiddenCard.style.opacity = "0";
+          tweet.style.display = "block";
+
+          requestAnimationFrame(() => {
+            hiddenCard.remove();
+            handler.afterChange(tweet);
+            tweet.dataset.processing = "false";
+          });
+        }
+
+        addHideButtonToVisibleTweet(tweet);
+        tweet.dataset.processing = "false";
       }
-    } else {
-      tweet.style.display = "block";
-      addHideButtonToVisibleTweet(tweet);
-    }
+    });
   } catch (error) {
-    if (tweetId) {
-      processedTweets.delete(tweetId);
-    }
+    tweet.dataset.processing = "false";
+    console.error(error);
+  }
+};
+
+const processTweetBatch = async (tweets) => {
+  for (const tweet of tweets) {
+    await processTweet(tweet);
   }
 };
 
 const setupObserver = () => {
-  if (tweetObserver) {
-    tweetObserver.disconnect();
+  if (tweetObserver || visibleTweetsObserver) {
+    return visibleTweetsObserver;
   }
 
-  const feedElement = document.querySelector(TwitterSelectors.feed);
-  if (!feedElement) {
-    return null;
-  }
+  visibleTweetsObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (
+          entry.target.matches?.(TwitterSelectors.tweet) &&
+          entry.isIntersecting
+        ) {
+          requestAnimationFrame(() => processTweet(entry.target));
+        }
+      });
+    },
+    {
+      rootMargin: "150px 0px",
+      threshold: 0,
+    }
+  );
 
-  tweetObserver = new MutationObserver(() => {
-    const tweets = getTweetsFromElement(document);
-    tweets.forEach(processTweet);
+  tweetObserver = new MutationObserver((mutations) => {
+    const newTweets = new Set();
+
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          if (node.matches?.(TwitterSelectors.tweet)) {
+            newTweets.add(node);
+          }
+
+          node.querySelectorAll?.(TwitterSelectors.tweet)?.forEach((tweet) => {
+            newTweets.add(tweet);
+          });
+        }
+      });
+    });
+
+    newTweets.forEach((tweet) => {
+      if (!tweet.dataset.observed) {
+        tweet.dataset.observed = "true";
+        visibleTweetsObserver.observe(tweet);
+      }
+    });
   });
 
-  tweetObserver.observe(feedElement, {
+  tweetObserver.observe(document, {
     childList: true,
     subtree: true,
   });
 
-  return tweetObserver;
+  getTweetsFromElement(document).forEach((tweet) => {
+    if (!tweet.dataset.observed) {
+      tweet.dataset.observed = "true";
+      visibleTweetsObserver.observe(tweet);
+    }
+  });
+
+  return visibleTweetsObserver;
 };
 
-const hideTweetsFromUser = async (username) => {
+const hideTweetsFromUser = async (username, tweet) => {
+  if (!tweet || !username) return;
+
   const allTweets = getTweetsFromElement(document, "");
+  tweet.dataset.processed = "false";
+  tweet.style.display = "block";
+  const hideButton = tweet.querySelector(
+    `.${TwitterSelectors.hideButtonClass}`
+  );
+  if (hideButton) {
+    hideButton.remove();
+  }
 
   allTweets.forEach((tweet) => {
     const tweetUsername = TwitterUsername.getFromTweet(tweet);
     if (tweetUsername === username) {
-      const tweetId = generatePostId(tweet);
-      processedTweets.delete(tweetId);
-      const hideButton = tweet.querySelector(
-        `.${TwitterSelectors.hideButtonClass}`
-      );
-      if (hideButton) {
-        hideButton.remove();
-      }
+      tweet.dataset.processed = "false";
     }
   });
 
-  for (const tweet of allTweets) {
-    const tweetUsername = TwitterUsername.getFromTweet(tweet);
-    if (tweetUsername === username) {
-      tweet.style.display = "none";
-      await processTweet(tweet);
-    }
-  }
-
-  setTimeout(() => {
-    const remainingTweets = getTweetsFromElement(document, "");
-    remainingTweets.forEach((tweet) => {
-      const tweetUsername = TwitterUsername.getFromTweet(tweet);
-      if (tweetUsername === username) {
-        tweet.style.display = "none";
-        const hideButton = tweet.querySelector(
-          `.${TwitterSelectors.hideButtonClass}`
-        );
-        if (hideButton) {
-          hideButton.remove();
-        }
-      }
-    });
-  }, 500);
+  await processTweet(tweet);
 };
 
-const showTweetsFromUser = async (username) => {
+const showTweetsFromUser = async (username, tweet) => {
+  if (!tweet || !username) return;
   await StorageManager.addUser(username);
-
   const allTweets = getTweetsFromElement(document, "");
+
+  tweet.style.display = "block";
+  tweet.dataset.processed = "false";
+  const showCards = await chromeStorageGet("showCards", true);
+  const hiddenCard = tweet.previousElementSibling;
+  if (hiddenCard?.matches?.(`.${TwitterSelectors.hiddenCardClass}`)) {
+    if (showCards) {
+      hiddenCard.style.display = "block";
+    } else {
+      hiddenCard.remove();
+    }
+  }
 
   allTweets.forEach((tweet) => {
     const tweetUsername = TwitterUsername.getFromTweet(tweet);
     if (tweetUsername === username) {
-      const tweetId = generatePostId(tweet);
-      processedTweets.delete(tweetId);
+      tweet.dataset.processed = "false";
     }
   });
 
-  const hiddenCards = document.querySelectorAll(TwitterSelectors.hiddenCard);
-  hiddenCards.forEach((card) => {
-    const cardUsername = TwitterUsername.extractClean(
-      card.querySelector(TwitterSelectors.cardUsername)?.textContent
-    );
-    if (cardUsername === username) {
-      card.remove();
-    }
-  });
-
-  for (const tweet of allTweets) {
-    const tweetUsername = TwitterUsername.getFromTweet(tweet);
-    if (tweetUsername === username) {
-      const tweetId = generatePostId(tweet);
-      processedTweets.add(tweetId);
-      tweet.style.display = "block";
-      const existingButton = tweet.querySelector(
-        `.${TwitterSelectors.hideButtonClass}`
-      );
-      if (existingButton) {
-        existingButton.remove();
-      }
-      addHideButtonToVisibleTweet(tweet);
-    }
-  }
-
-  setTimeout(() => {
-    const remainingTweets = getTweetsFromElement(document, "");
-    remainingTweets.forEach((tweet) => {
-      const tweetUsername = TwitterUsername.getFromTweet(tweet);
-      if (tweetUsername === username) {
-        const tweetId = generatePostId(tweet);
-        processedTweets.add(tweetId);
-        tweet.style.display = "block";
-        const existingButton = tweet.querySelector(
-          `.${TwitterSelectors.hideButtonClass}`
-        );
-        if (existingButton) {
-          existingButton.remove();
-        }
-        addHideButtonToVisibleTweet(tweet);
-      }
-    });
-  }, 500);
+  await processTweet(tweet);
 };
 
 document.addEventListener(
@@ -197,8 +200,7 @@ document.addEventListener(
   (e) => {
     e.preventDefault();
     e.stopPropagation();
-    debugLog(`Hide event triggered for user: ${e.detail.username}`);
-    hideTweetsFromUser(e.detail.username);
+    hideTweetsFromUser(e.detail.username, e.detail.tweet);
   },
   { once: false }
 );
@@ -206,31 +208,28 @@ document.addEventListener(
 document.addEventListener("showTweetsFromUser", (e) => {
   e.preventDefault();
   e.stopPropagation();
-  debugLog(`Show event triggered for user: ${e.detail.username}`);
-  showTweetsFromUser(e.detail.username);
+  showTweetsFromUser(e.detail.username, e.detail.tweet);
 });
 
 export const processTwitterFeed = async () => {
   try {
-    processedTweets.clear();
-
     const isEnabled = await chromeStorageGet("isEnabled", true);
     if (!isEnabled) return;
 
     debugLog("Starting Twitter feed processing");
-
-    const tweets = getTweetsFromElement(document);
+    setupObserver();
+    const tweets = getTweetsFromElement(document, "");
     if (tweets.length > 0) {
-      for (const tweet of tweets) {
-        await processTweet(tweet);
-      }
+      await processTweetBatch(tweets);
       setupObserver();
     } else {
       setTimeout(() => processTwitterFeed(), 2000);
     }
 
     const showCards = await chromeStorageGet("showCards", true);
-    const hiddenCards = document.querySelectorAll(TwitterSelectors.hiddenCard);
+    const hiddenCards = document.querySelectorAll(
+      `.${TwitterSelectors.hiddenCardClass}`
+    );
     hiddenCards.forEach((card) => {
       card.style.display = showCards ? "block" : "none";
     });
@@ -240,9 +239,13 @@ export const processTwitterFeed = async () => {
 };
 
 export const cleanupProcessor = () => {
-  processedTweets.clear();
+  tweetQueue.clear();
   if (tweetObserver) {
     tweetObserver.disconnect();
     tweetObserver = null;
+  }
+  if (visibleTweetsObserver) {
+    visibleTweetsObserver.disconnect();
+    visibleTweetsObserver = null;
   }
 };

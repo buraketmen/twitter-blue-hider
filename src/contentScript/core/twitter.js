@@ -126,7 +126,7 @@ export const createHideButton = (tweet) => {
       tweet.dispatchEvent(
         new CustomEvent("hideTweetsFromUser", {
           bubbles: true,
-          detail: { username },
+          detail: { username, tweet },
         })
       );
     }
@@ -134,7 +134,7 @@ export const createHideButton = (tweet) => {
 
   addTooltip(
     hideButton,
-    "Hide this user's tweets and remove them from whitelist"
+    "Hide the tweet and remove them from whitelist. It will become available after refreshing."
   );
 
   return hideButton;
@@ -147,7 +147,7 @@ export const createHiddenPostCard = async (tweet) => {
 
   const showCards = await chromeStorageGet("showCards", true);
   const card = document.createElement("div");
-  card.className = TwitterSelectors.hiddenCard.replace(".", "");
+  card.className = TwitterSelectors.hiddenCardClass;
   card.style.cssText = `
     padding: 16px;
     font-family: 'TwitterChirp', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -189,7 +189,7 @@ export const createHiddenPostCard = async (tweet) => {
 
   addTooltip(
     button,
-    "Show this tweet and add user to whitelist. It will be available for new tweets."
+    "Show the tweet and add user to whitelist. It will become available after refreshing."
   );
 
   button.addEventListener("click", async () => {
@@ -202,13 +202,13 @@ export const createHiddenPostCard = async (tweet) => {
         tweet.dispatchEvent(
           new CustomEvent("showTweetsFromUser", {
             bubbles: true,
-            detail: { username },
+            detail: { username, tweet },
           })
         );
 
         const placeholder = document.createElement("div");
         placeholder.style.height = "72px";
-        placeholder.style.transition = "all 0.1s ease";
+        placeholder.style.transition = "all 0.2s ease";
         tweet.parentNode.insertBefore(placeholder, tweet);
 
         tweet.style.position = "absolute";
@@ -221,7 +221,7 @@ export const createHiddenPostCard = async (tweet) => {
 
         const finalHeight = tweet.offsetHeight;
 
-        tweet.style.transition = "all 0.1s ease";
+        tweet.style.transition = "all 0.2s ease";
         placeholder.offsetHeight; // Force reflow
 
         tweet.style.opacity = "1";
@@ -293,7 +293,9 @@ export const addHideButtonToVisibleTweet = (tweet, retryCount = 0) => {
 
 export const showAllTweetsFromUser = async (username) => {
   try {
-    const hiddenCards = document.querySelectorAll(TwitterSelectors.hiddenCard);
+    const hiddenCards = document.querySelectorAll(
+      `.${TwitterSelectors.hiddenCardClass}`
+    );
 
     for (const card of hiddenCards) {
       const cardUsernameElement = card.querySelector(
