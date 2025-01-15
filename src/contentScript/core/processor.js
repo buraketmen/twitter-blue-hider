@@ -106,8 +106,8 @@ const setupObserver = () => {
       }
     },
     {
-      rootMargin: "150px 0px",
-      threshold: 0.1,
+      rootMargin: "0px",
+      threshold: 0.05,
     }
   );
 
@@ -222,12 +222,10 @@ export const processTwitterFeed = async () => {
     const isEnabled = await chromeStorageGet("isEnabled", true);
     if (!isEnabled) return;
 
-    debugLog("Starting Twitter feed processing");
     setupObserver();
     const tweets = getTweetsFromElement(document, "");
     if (tweets.length > 0) {
       await processTweetBatch(tweets);
-      setupObserver();
     } else {
       setTimeout(() => processTwitterFeed(), 2000);
     }
