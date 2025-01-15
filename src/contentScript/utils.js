@@ -1,8 +1,6 @@
 import { TwitterSelectors, TwitterUsername } from "./constants";
 import { tweetQueue } from "./core/task-queue";
 
-let lastScrollTime = 0; // Prevents rapid scrolling
-
 export const debugLog = (message) => {
   console.log(`[Twitter Blue Hider]: ${message}`);
 };
@@ -96,17 +94,18 @@ export const isVerifiedAccount = (element) => {
 
 export const getTweetsFromElement = (element, suffix = "") => {
   if (!element) return [];
-  const tweets = [];
+
+  const tweets = new Set();
+
   TwitterSelectors.tweet.forEach((selector) => {
-    const tweetNodes = element.querySelectorAll(selector + suffix);
-    if (tweetNodes) tweets.push(...tweetNodes);
-  });
-  const uniqueOuterText = [...new Set(tweets.map((tweet) => tweet.outerText))];
-  const uniqueTweets = uniqueOuterText.map((outerText) => {
-    return tweets.find((tweet) => tweet.outerText === outerText);
+    element.querySelectorAll(selector + suffix)?.forEach((tweet) => {
+      if (tweet.isConnected) {
+        tweets.add(tweet);
+      }
+    });
   });
 
-  return uniqueTweets;
+  return Array.from(tweets);
 };
 
 export const isTweetProcessing = (tweet) => {
@@ -148,38 +147,22 @@ export const handleElementVisibility = (element, options = {}) => {
   const initialHeight = elementRect.height;
 
   const adjustScroll = async (heightDiff) => {
-    if (!scrollAdjustment || Math.abs(heightDiff) <= 10) return;
-    if (window.scrollY <= 150) return;
+    if (!scrollAdjustment || Math.abs(heightDiff) <= 5) return;
+    if (window.scrollY <= 100) return;
 
-    const now = Date.now();
-    if (now - lastScrollTime < 150) return;
-    lastScrollTime = now;
-
-    const elementVisible =
-      elementRect.top >= 0 && elementRect.bottom <= window.innerHeight;
-
-    if (!elementVisible) return;
+    if (elementRect.top < 0 || elementRect.bottom > window.innerHeight) return;
 
     await tweetQueue.add(
       () =>
         new Promise((resolve) => {
-          const currentScroll = window.scrollY;
-          const targetScroll = Math.max(0, currentScroll - heightDiff);
-
-          if (Math.abs(currentScroll - targetScroll) <= 10) {
-            resolve();
-            return;
+          if (heightDiff > 0) {
+            window.scrollBy({
+              top: -Math.min(heightDiff, 150),
+              behavior: "auto",
+            });
           }
 
-          window.scrollTo({
-            top: targetScroll,
-            behavior: "instant",
-          });
-
-          // Wait for the scroll to complete
-          requestAnimationFrame(() => {
-            setTimeout(resolve, 32);
-          });
+          resolve();
         })
     );
   };
@@ -187,10 +170,15 @@ export const handleElementVisibility = (element, options = {}) => {
   return {
     height: initialHeight,
     afterChange: async (newElement) => {
-      if (!newElement) return;
+      if (!newElement?.isConnected) return;
+
       const newHeight = newElement.getBoundingClientRect().height;
       const heightDiff = initialHeight - newHeight;
-      await adjustScroll(heightDiff);
+
+      if (Math.abs(heightDiff) > 5) {
+        await adjustScroll(heightDiff);
+      }
+
       onComplete(newElement);
     },
   };

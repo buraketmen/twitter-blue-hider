@@ -21,6 +21,7 @@ const processTweet = async (tweet) => {
     }
 
     tweet.dataset.processing = "true";
+
     const { handler } = await handleTweetVisibility(tweet);
 
     await tweetQueue.add(async () => {
@@ -73,7 +74,6 @@ const processTweet = async (tweet) => {
     });
   } catch (error) {
     tweet.dataset.processing = "false";
-    console.error(error);
   }
 };
 
@@ -90,18 +90,24 @@ const setupObserver = () => {
 
   visibleTweetsObserver = new IntersectionObserver(
     (entries) => {
-      entries.forEach((entry) => {
-        if (
+      const visibleEntries = entries.filter(
+        (entry) =>
           entry.target.matches?.(TwitterSelectors.tweet) &&
-          entry.isIntersecting
-        ) {
-          requestAnimationFrame(() => processTweet(entry.target));
-        }
-      });
+          entry.isIntersecting &&
+          !entry.target.dataset.processed
+      );
+
+      if (visibleEntries.length) {
+        visibleEntries.forEach((entry) => {
+          requestIdleCallback(() => processTweet(entry.target), {
+            timeout: 1000,
+          });
+        });
+      }
     },
     {
       rootMargin: "150px 0px",
-      threshold: 0,
+      threshold: 0.1,
     }
   );
 
@@ -240,11 +246,20 @@ export const processTwitterFeed = async () => {
 
 export const cleanupProcessor = () => {
   tweetQueue.clear();
+
   if (tweetObserver) {
     tweetObserver.disconnect();
     tweetObserver = null;
   }
+
   if (visibleTweetsObserver) {
+    const observedTweets = document.querySelectorAll('[data-observed="true"]');
+    observedTweets.forEach((tweet) => {
+      tweet.dataset.observed = "false";
+      tweet.dataset.processed = "false";
+      tweet.dataset.processing = "false";
+    });
+
     visibleTweetsObserver.disconnect();
     visibleTweetsObserver = null;
   }
