@@ -8,14 +8,12 @@ chrome.runtime.onInstalled.addListener(async () => {
   }
 });
 
-chrome.runtime.onSuspend.addListener(() => {
-  chrome.tabs.query({}, (tabs) => {
-    tabs.forEach((tab) => {
-      try {
-        chrome.tabs.sendMessage(tab.id, { action: "CLEAN_UP" });
-      } catch (error) {
-        console.error("Error sending cleanup message:", error);
-      }
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.isEnabled !== undefined) {
+    chrome.tabs.query({ url: "*://x.com/*" }, (tabs) => {
+      tabs.forEach((tab) => {
+        chrome.tabs.reload(tab.id);
+      });
     });
-  });
+  }
 });

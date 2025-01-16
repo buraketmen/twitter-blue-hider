@@ -4,7 +4,7 @@ import {
   chromeStorageGet,
   isVerifiedAccount,
   getTweetsFromElement,
-  handleTweetVisibility,
+  handleElementVisibility,
   isTweetProcessing,
 } from "../utils";
 import { tweetQueue } from "./task-queue";
@@ -12,7 +12,6 @@ import { StorageManager } from "./managers";
 import { createHiddenPostCard, addHideButtonToVisibleTweet } from "./twitter";
 
 let tweetObserver = null;
-let visibleTweetsObserver = null;
 
 const processTweet = async (tweet) => {
   try {
@@ -22,7 +21,7 @@ const processTweet = async (tweet) => {
 
     tweet.dataset.processing = "true";
 
-    const { handler } = await handleTweetVisibility(tweet);
+    const { afterChange } = handleElementVisibility(tweet);
 
     await tweetQueue.add(async () => {
       const isVerified = isVerifiedAccount(tweet);
@@ -47,7 +46,9 @@ const processTweet = async (tweet) => {
               requestAnimationFrame(() => {
                 tweet.style.display = "none";
                 createdHiddenCard.style.opacity = "1";
-                handler.afterChange(createdHiddenCard);
+
+                afterChange(createdHiddenCard);
+
                 tweet.dataset.processed = "true";
                 tweet.dataset.processing = "false";
                 resolve();
@@ -63,7 +64,9 @@ const processTweet = async (tweet) => {
 
           requestAnimationFrame(() => {
             hiddenCard.remove();
-            handler.afterChange(tweet);
+
+            afterChange(tweet);
+
             tweet.dataset.processing = "false";
           });
         }
@@ -73,7 +76,9 @@ const processTweet = async (tweet) => {
       }
     });
   } catch (error) {
+    debugLog(`Error processing tweet: ${error.message}`);
     tweet.dataset.processing = "false";
+    tweet.dataset.processed = "false";
   }
 };
 
@@ -84,32 +89,9 @@ const processTweetBatch = async (tweets) => {
 };
 
 const setupObserver = () => {
-  if (tweetObserver || visibleTweetsObserver) {
-    return visibleTweetsObserver;
+  if (tweetObserver) {
+    return tweetObserver;
   }
-
-  visibleTweetsObserver = new IntersectionObserver(
-    (entries) => {
-      const visibleEntries = entries.filter(
-        (entry) =>
-          entry.target.matches?.(TwitterSelectors.tweet) &&
-          entry.isIntersecting &&
-          !entry.target.dataset.processed
-      );
-
-      if (visibleEntries.length) {
-        visibleEntries.forEach((entry) => {
-          requestIdleCallback(() => processTweet(entry.target), {
-            timeout: 1000,
-          });
-        });
-      }
-    },
-    {
-      rootMargin: "0px",
-      threshold: 0.05,
-    }
-  );
 
   tweetObserver = new MutationObserver((mutations) => {
     const newTweets = new Set();
@@ -128,12 +110,7 @@ const setupObserver = () => {
       });
     });
 
-    newTweets.forEach((tweet) => {
-      if (!tweet.dataset.observed) {
-        tweet.dataset.observed = "true";
-        visibleTweetsObserver.observe(tweet);
-      }
-    });
+    processTweetBatch(Array.from(newTweets));
   });
 
   tweetObserver.observe(document, {
@@ -141,14 +118,10 @@ const setupObserver = () => {
     subtree: true,
   });
 
-  getTweetsFromElement(document).forEach((tweet) => {
-    if (!tweet.dataset.observed) {
-      tweet.dataset.observed = "true";
-      visibleTweetsObserver.observe(tweet);
-    }
-  });
+  const tweets = getTweetsFromElement(document);
+  processTweetBatch(tweets);
 
-  return visibleTweetsObserver;
+  return tweetObserver;
 };
 
 const hideTweetsFromUser = async (username, tweet) => {
@@ -250,15 +223,13 @@ export const cleanupProcessor = () => {
     tweetObserver = null;
   }
 
-  if (visibleTweetsObserver) {
-    const observedTweets = document.querySelectorAll('[data-observed="true"]');
-    observedTweets.forEach((tweet) => {
-      tweet.dataset.observed = "false";
+  if (tweetObserver) {
+    const processedTweets = document.querySelectorAll(
+      '[data-processed="true"]'
+    );
+    processedTweets.forEach((tweet) => {
       tweet.dataset.processed = "false";
       tweet.dataset.processing = "false";
     });
-
-    visibleTweetsObserver.disconnect();
-    visibleTweetsObserver = null;
   }
 };

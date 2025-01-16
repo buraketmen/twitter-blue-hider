@@ -5,12 +5,6 @@ import { cleanupProcessor, processTwitterFeed } from "../core/processor";
 export let isEnabled = true;
 
 export const cleanup = () => {
-  if (window._twitterBlueHiderMessageHandler) {
-    chrome.runtime.onMessage.removeListener(
-      window._twitterBlueHiderMessageHandler
-    );
-    delete window._twitterBlueHiderMessageHandler;
-  }
   cleanupProcessor();
 };
 
@@ -65,7 +59,7 @@ export const handleExtensionStateChange = async () => {
 chrome.storage.onChanged.addListener((changes) => {
   try {
     if (!checkExtensionContext()) return;
-    if (changes.showCards || changes.isEnabled) {
+    if (changes.showCards) {
       handleExtensionStateChange();
     }
   } catch (error) {

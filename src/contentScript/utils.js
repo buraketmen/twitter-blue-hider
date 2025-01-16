@@ -1,5 +1,5 @@
 import { TwitterSelectors, TwitterUsername } from "./constants";
-import { tweetQueue } from "./core/task-queue";
+import { scrollManager } from "./core/scroll-queue";
 
 export const debugLog = (message) => {
   console.log(`[Twitter Blue Hider]: ${message}`);
@@ -112,93 +112,24 @@ export const isTweetProcessing = (tweet) => {
   return tweet.dataset.processing === "true";
 };
 
-let scrollQueue = [];
-let isProcessingScroll = false;
-
-const processScrollQueue = () => {
-  if (isProcessingScroll || scrollQueue.length === 0) return;
-
-  isProcessingScroll = true;
-  const { position, callback } = scrollQueue.shift();
-
-  window.scrollTo({
-    top: Math.max(0, position),
-    behavior: "auto",
-  });
-
-  setTimeout(() => {
-    isProcessingScroll = false;
-    callback?.();
-    processScrollQueue();
-  }, 50);
-};
-
-export const handleElementVisibility = (element, options = {}) => {
-  const { scrollAdjustment = true, onComplete = () => {} } = options;
-
+export const handleElementVisibility = (element) => {
   if (!element || !element.isConnected) {
     return {
-      height: 0,
       afterChange: async () => {},
     };
   }
 
-  const elementRect = element.getBoundingClientRect();
-  const initialHeight = elementRect.height;
-
-  const adjustScroll = async (heightDiff) => {
-    if (!scrollAdjustment || Math.abs(heightDiff) <= 5) return;
-    if (window.scrollY <= 100) return;
-
-    if (elementRect.top < 0 || elementRect.bottom > window.innerHeight) return;
-
-    await tweetQueue.add(
-      () =>
-        new Promise((resolve) => {
-          if (heightDiff > 0) {
-            window.scrollBy({
-              top: -Math.min(heightDiff, 150),
-              behavior: "auto",
-            });
-          }
-
-          resolve();
-        })
-    );
-  };
+  const height = element.getBoundingClientRect().height;
+  const elementPosition = scrollManager.getElementPosition(element);
 
   return {
-    height: initialHeight,
     afterChange: async (newElement) => {
       if (!newElement?.isConnected) return;
-
-      const newHeight = newElement.getBoundingClientRect().height;
-      const heightDiff = initialHeight - newHeight;
-
-      if (Math.abs(heightDiff) > 5) {
-        await adjustScroll(heightDiff);
-      }
-
-      onComplete(newElement);
+      await scrollManager.adjustScroll({
+        tweetHeight: height,
+        newElementHeight: newElement.getBoundingClientRect().height,
+        tweetElementPosition: elementPosition,
+      });
     },
-  };
-};
-
-export const handleTweetVisibility = async (tweet, options = {}) => {
-  const handler = handleElementVisibility(tweet, options);
-
-  if (!handler) {
-    return {
-      initialHeight: 0,
-      handler: {
-        height: 0,
-        afterChange: async () => {},
-      },
-    };
-  }
-
-  return {
-    initialHeight: handler.height || 0,
-    handler,
   };
 };

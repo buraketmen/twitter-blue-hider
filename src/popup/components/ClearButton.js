@@ -27,19 +27,6 @@ const ClearButton = () => {
   const clearWhitelist = async () => {
     try {
       await chrome.storage.sync.set({ whitelistedUsers: [] });
-
-      try {
-        const [tab] = await chrome.tabs.query({
-          active: true,
-          currentWindow: true,
-        });
-        if (tab?.url?.includes("x.com") || tab?.url?.includes("twitter.com")) {
-          await chrome.tabs.sendMessage(tab.id, { type: "REFRESH_FEED" });
-        }
-      } catch (error) {
-        // Silent error
-      }
-
       message.success("Whitelist cleared successfully.");
     } catch (error) {
       message.error("Failed to clear whitelist.");
